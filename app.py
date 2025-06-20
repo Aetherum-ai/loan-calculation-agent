@@ -18,52 +18,9 @@ url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest'
 headers = {'Accepts': 'application/json', 'X-CMC_PRO_API_KEY': API_KEY}
 params = {'start': '1', 'limit': '100', 'convert': 'USD'}
 
-# -------- USER PORTFOLIO --------
-user_portfolio = {
-    'BTC': 200_000,
-    'ETH': 400_000,
-    'SOL': 200_000,
-    'XRP': 200_000
-}
-
-def fetch_historical_data(symbol, days=90):
-    """Fetch historical price data from CoinGecko API"""
-    # Map of common symbols to CoinGecko IDs
-    coin_id_map = {
-        'BTC': 'bitcoin',
-        'ETH': 'ethereum',
-        'SOL': 'solana',
-        'XRP': 'ripple',
-        'LINK': 'chainlink',
-        'DOT': 'polkadot',
-        'ADA': 'cardano',
-        'AVAX': 'avalanche-2'
-    }
-    
-    coin_id = coin_id_map.get(symbol)
-    if not coin_id:
-        return None
-        
-    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
-    params = {
-        "vs_currency": "usd",
-        "days": days,
-        "interval": "daily"
-    }
-    
-    try:
-        response = requests.get(url, params=params)
-        data = response.json()
-        
-        # Convert price data to DataFrame
-        prices = data['prices']
-        df = pd.DataFrame(prices, columns=['timestamp', 'price'])
-        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-        return df
-    except:
-        return None
 
 def fetch_data():
+    """Fetch data for the top 100 cryptocurrencies from CoinMarketCap."""
     res = requests.get(url, headers=headers, params=params)
     data = res.json()['data']
     return pd.DataFrame([{
@@ -75,18 +32,102 @@ def fetch_data():
         '30d Change (%)': coin['quote']['USD']['percent_change_30d'],
         '90d Change (%)': coin['quote']['USD']['percent_change_90d'],
         'Market Cap': coin['quote']['USD']['market_cap']
-    } for coin in data if coin['symbol'] in user_portfolio])
+    } for coin in data])
 
 
+# -------- LOGIC from loan_calc4.py: LTV & INTEREST RULES --------
+def classify_risk(symbol, vol, mcap):
+    """Classify asset risk into tiers based on volatility and market cap."""
+    if vol < 3 and mcap > 1e10:
+        return "Tier 1"
+    elif vol < 6 and mcap > 5e9:
+        return "Tier 1.5"
+    elif vol < 10:
+        return "Tier 2"
+    else:
+        return "Tier 3"
+
+def ltv_by_risk(tier, vol):
+    """Determine Loan-to-Value (LTV) based on risk tier and volatility."""
+    base = {'Tier 1': 70, 'Tier 1.5': 65, 'Tier 2': 55, 'Tier 3': 45}
+    adj = 0
+    if vol > 7:
+        adj = -5
+    elif vol < 2:
+        adj = +2
+    return max(0, base.get(tier, 50) + adj)
+
+def interest_by_risk(tier, vol):
+    """Determine interest rate based on risk tier and volatility."""
+    base_rate = 3.0  # Base risk-free rate
+    premium = {'Tier 1': 4, 'Tier 1.5': 4.5, 'Tier 2': 5, 'Tier 3': 6}
+    adj = 1 if vol > 10 else 0
+    return base_rate + premium.get(tier, 5) + adj
+
+def calculate_aetherum_loan(selected_tokens, user_portfolio, df, months):
+    """Calculate loan metrics based on the rules from loan_calc4.py."""
+    results = []
+    total_collateral = 0
+    total_loan = 0
+    total_interest_amount = 0
+
+    for symbol in selected_tokens:
+        if symbol not in df['Symbol'].values:
+            continue
+
+        coin = df[df['Symbol'] == symbol].iloc[0]
+        vol = abs(coin['24h Change (%)'])
+        mcap = coin['Market Cap']
+        portfolio_amount = user_portfolio.get(symbol, 0)
+
+        tier = classify_risk(symbol, vol, mcap)
+        ltv = ltv_by_risk(tier, vol)
+        interest = interest_by_risk(tier, vol)
+        loan_amount = portfolio_amount * ltv / 100
+        interest_amount = loan_amount * interest / 100
+
+        results.append({
+            "Asset": symbol,
+            "Risk Tier": tier,
+            "24h Vol (%)": f"{vol:.2f}",
+            "LTV (%)": ltv,
+            "Interest Rate (%)": interest,
+            "Collateral ($)": f"${portfolio_amount:,.2f}",
+            "Loan Amount ($)": f"${loan_amount:,.2f}"
+        })
+
+        total_collateral += portfolio_amount
+        total_loan += loan_amount
+        total_interest_amount += interest_amount
+
+    df_result = pd.DataFrame(results)
+
+    if total_collateral > 0 and total_loan > 0:
+        portfolio_ltv = (total_loan / total_collateral) * 100
+        weighted_interest = (total_interest_amount / total_loan) * 100
+        liquidation_ltv = portfolio_ltv * 1.2
+        expense_ratio = 0.05  # Fixed 5% from loan_calc4.py
+        emi = (total_loan * (1 + weighted_interest / 100)) / months
+    else:
+        portfolio_ltv, weighted_interest, liquidation_ltv, expense_ratio, emi = 0, 0, 0, 0, 0
+
+    summary = {
+        "df_result": df_result,
+        "total_collateral": total_collateral,
+        "total_loan": total_loan,
+        "portfolio_ltv": portfolio_ltv,
+        "liquidation_ltv": liquidation_ltv,
+        "weighted_interest": weighted_interest,
+        "expense_ratio": expense_ratio,
+        "emi": emi
+    }
+    return summary
 
 
 def main():
     st.title("Finance Agent Streamlit App")
-
     
     TOTAL_PORTFOLIO_VALUE = 1_000_000  # Fixed $1M total portfolio value
-
-    
     
     st.header("Portfolio Selection")
     portfolio_type = st.selectbox(
@@ -97,60 +138,45 @@ def main():
 
     # --- Real-time Crypto Data ---
     st.header("Real-Time Crypto Market Data")
-    df = fetch_data()
-    if not df.empty:
-        st.dataframe(df)
+    market_df = fetch_data()
+    if not market_df.empty:
+        st.dataframe(market_df)
     else:
-        st.info("No data to display.")
+        st.info("Could not fetch market data.")
 
     # Update portfolio based on selection
     if portfolio_type == "Custom":
-        available_tokens = df['Symbol'].tolist()
+        available_tokens = market_df['Symbol'].tolist()
         selected_tokens = st.multiselect(
             "Select tokens for your portfolio:",
             available_tokens,
-            default=available_tokens[:2]
+            default=available_tokens[:4] # Default to first 4 tokens
         )
 
         if selected_tokens:
             st.subheader("Portfolio Allocation")
             num_tokens = len(selected_tokens)
-            
-            # Initialize allocations dictionary
             allocations = {}
-            remaining_percentage = 100
+            # Default to equal allocation
+            for token in selected_tokens:
+                allocations[token] = 100 / num_tokens
             
-            # Create sliders for all but the last token
-            for i, token in enumerate(selected_tokens[:-1]):
-                max_allowed = remaining_percentage if i < len(selected_tokens)-1 else remaining_percentage
-                allocation = st.slider(
-                    f"{token} allocation (%)",
-                    min_value=0,
-                    max_value=max_allowed,
-                    value=min(100 // num_tokens, max_allowed),
-                    key=f"slider_{token}"
-                )
-                allocations[token] = allocation
-                remaining_percentage -= allocation
-            
-            # Last token automatically gets the remaining percentage
-            if selected_tokens:
-                last_token = selected_tokens[-1]
-                allocations[last_token] = remaining_percentage
-                st.info(f"{last_token} allocation: {remaining_percentage}%")
-
             # Convert percentages to amounts
             user_portfolio = {
                 token: (percentage / 100) * TOTAL_PORTFOLIO_VALUE 
                 for token, percentage in allocations.items()
             }
+        else:
+            user_portfolio = {} # Empty portfolio if no tokens are selected
+            st.warning("Please select at least one token.")
+
     else:
         user_portfolio = SAMPLE_PORTFOLIOS[portfolio_type]
         selected_tokens = list(user_portfolio.keys())
-        st.info(f"Using {portfolio_type} portfolio")
+        st.info(f"Using pre-defined {portfolio_type} portfolio.")
 
     # Display selected portfolio
-    if 'user_portfolio' in locals():
+    if user_portfolio:
         st.subheader("Selected Portfolio")
         portfolio_df = pd.DataFrame([
             {
@@ -161,8 +187,6 @@ def main():
             for k, v in user_portfolio.items()
         ])
         st.table(portfolio_df)
-
-
 
     st.header("Loan Input")
     with st.form("loan_form"):
@@ -176,42 +200,53 @@ def main():
 
         submit = st.form_submit_button("Calculate Loan")
 
-        if submit:
-            # Convert dictionary values to float
-            user_portfolio = {k: float(v) for k, v in user_portfolio.items()}
+        if submit and user_portfolio:
+            # --- Aetherum AI Agent Calculation ---
             total_collateral = sum(user_portfolio.values())
-            portfolio_df = df[df['Symbol'].isin(selected_tokens)]
-
             prompt = f"""
-    The user has:
-    {chr(10).join([f"${user_portfolio[sym]:,.2f} in {sym}" for sym in selected_tokens])}
-    Total Collateral = ${total_collateral:,.2f}
+            The user has:
+            {chr(10).join([f"${amount:,.2f} in {symbol}" for symbol, amount in user_portfolio.items()])}
+            Total Collateral = ${total_collateral:,.2f}
 
-    Loan parameters:
-    - Loan Length: {months} months
-    - Payout Currency: {payout}
-    - Inception Date: {inception_date}
-    - Bank: {bank}
-    """
-            response, loan_metrics = run_finance_agent(prompt)
+            Loan parameters:
+            - Loan Length: {months} months
+            - Payout Currency: {payout}
+            - Inception Date: {inception_date}
+            - Bank: {bank}
+            """
+            agent_response, loan_metrics = run_finance_agent(prompt)
             
-            # Display loan details
-            st.subheader("Loan Details")
-            if isinstance(loan_metrics, dict):  # Add type check
+            st.header("Aetherum AI Agent Loan Calculator")
+            if isinstance(loan_metrics, dict):
                 if 'timestamp' in loan_metrics:
                     cache_time = datetime.datetime.fromtimestamp(loan_metrics['timestamp'])
                     st.info(f"Using cached results from {cache_time.strftime('%Y-%m-%d %H:%M:%S')}")
-                    
-                st.write(f"Portfolio Value: ${loan_metrics['portfolio_value']:,.2f}")
-                st.write(f"Loan Amount: ${loan_metrics['loan_amount']:,.2f}")
-                st.write(f"Weighted LTV: {loan_metrics['weighted_ltv']:.2%}")
-                st.write(f"Liquidation LTV: {loan_metrics['liquidation_ltv']:.2%}")
+                st.write(f"**Portfolio Value:** ${loan_metrics.get('portfolio_value', 0):,.2f}")
+                st.write(f"**Loan Amount:** ${loan_metrics.get('loan_amount', 0):,.2f}")
+                st.write(f"**Weighted LTV:** {loan_metrics.get('weighted_ltv', 0):.2%}")
+                st.write(f"**Liquidation LTV:** {loan_metrics.get('liquidation_ltv', 0):.2%}")
+                st.subheader("Market Analysis and Interest Rate")
+                st.markdown(agent_response, unsafe_allow_html=True)
             else:
-                st.error("Failed to calculate loan metrics")
+                st.error("Failed to calculate loan metrics from AI Agent.")
             
-            # Display market analysis
-            st.subheader("Market Analysis and Interest Rate")
-            st.markdown(response, unsafe_allow_html=True)
+            st.divider()
+
+            # --- Aetherum (Hard-coded Rules) Loan Calculation ---
+            st.header("Aetherum Loan")
+            aetherum_loan_details = calculate_aetherum_loan(selected_tokens, user_portfolio, market_df, months)
+
+            st.subheader("Asset-Based Loan Breakdown")
+            st.dataframe(aetherum_loan_details["df_result"])
+
+            st.subheader("Final Loan Details")
+            st.write(f"**Total Collateral Selected:** ${aetherum_loan_details['total_collateral']:,.2f}")
+            st.write(f"**Total Loan Amount:** ${aetherum_loan_details['total_loan']:,.2f}")
+            st.write(f"**Portfolio LTV:** {aetherum_loan_details['portfolio_ltv']:.2f}%")
+            st.write(f"**Liquidation LTV:** {aetherum_loan_details['liquidation_ltv']:.2f}%")
+            st.write(f"**Interest Rate:** {aetherum_loan_details['weighted_interest']:.2f}%")
+            st.write(f"**Expense Ratio:** {aetherum_loan_details['expense_ratio']*100:.2f}%")
+            st.write(f"**Monthly EMI:** ${aetherum_loan_details['emi']:,.2f}")
 
 
 if __name__ == "__main__":
