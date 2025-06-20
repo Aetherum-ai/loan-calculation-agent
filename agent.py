@@ -1,4 +1,6 @@
 from cache_utils import ResponseCache
+import time 
+import json
 
 def run_finance_agent(prompt):
     from agno.models.groq import Groq
@@ -58,7 +60,7 @@ def run_finance_agent(prompt):
         '''
         Use this function to calculate the risk tier based on volatility and market cap. 
         '''
-        df = fetch_data()
+        #df = fetch_data()
         df['Volatility Score'] = (
             df['24h Change (%)'].abs() +
             df['7d Change (%)'].abs()/7 +
@@ -78,9 +80,10 @@ def run_finance_agent(prompt):
         return df[['Symbol', 'Name', 'Last Price', '24h Change (%)', '7d Change (%)', '30d Change (%)', '90d Change (%)', 'Volatility Score', 'Market Cap', 'Risk Score', 'Risk Tier']]
 
 
+
     def get_crypto_historical_data(coin_id, vs_currency, days):
         """
-        Use this function to fetch historical cryptocurrency data which will be used to calculate correlation and make risk assessments.
+        Fetches historical cryptocurrency data (price, market cap, volume) for a given number of days.
 
         """
         end_date = datetime.datetime.now()
@@ -115,26 +118,19 @@ def run_finance_agent(prompt):
         except requests.exceptions.RequestException as e:
             print(f"Error fetching data for {coin_id}: {e}")
             return None
-        
+
 
     def get_crypto_correlation_matrix(crypto_symbols, vs_currency="usd", days=90):
         """
-        Use this function to calculate the correlation matrix from historical data of multiple cryptocurrencies.
+        Fetches historical price data for multiple cryptocurrencies and calculates their correlation matrix.
 
         """
-
-
         all_prices = pd.DataFrame()
         coin_id_map = {
             'BTC': 'bitcoin',
             'ETH': 'ethereum',
             'SOL': 'solana',
-            'XRP': 'ripple',
-            'LINK': 'chainlink',
-            'DOT': 'polkadot',
-            'ADA': 'cardano',
-            'AVAX': 'avalanche-2'
-
+            'XRP': 'ripple'
         }
 
         for symbol in crypto_symbols:
@@ -163,8 +159,8 @@ def run_finance_agent(prompt):
 
         print("\nCalculating correlation matrix...")
         correlation_matrix = all_prices.corr()
-
         return correlation_matrix
+
 
 
     def assign_base_ltv_from_tier(tier):
@@ -313,7 +309,7 @@ def run_finance_agent(prompt):
 
         ],  
         description=dedent("""\
-                      You are an elite crypto financial analyst. Follow the given instructions to analyze the user's crypto portfolio and determine a fair and safe loan value based on real-time market conditions.
+                      You are a professional crypto financial analyst. Follow the given instructions to analyze the user's crypto portfolio and determine a fair and safe loan value based on real-time market conditions.
 
         """),
         instructions=dedent("""
@@ -322,17 +318,28 @@ def run_finance_agent(prompt):
             1. Search and analyze current crypto market news and trends
             2. Calculate the appropriate interest rate using:
                - Base rate (Federal funds rate): 4.33%
+               - Aetherum premium: 2%
                - Risk premium based on provided risk tiers
                - Volatility premium (1% if volatility > 10%)
-               - Diversification discount (0.25% if 3+ uncorrelated assets)
+               
             3. Generate a detailed market analysis report
+             
             
-            DO NOT perform any LTV or loan amount calculations - use the provided values.
-
+            DO NOT perform any LTV or loan amount calculations - use the provided values. 
+                            
         """),
         expected_output=dedent("""\
 
-           Im giving you the portfolio and loan details, you will not calculate LTV or loan amount, just provide market analysis and interest rate.
+           Im giving you the portfolio and loan details, just provide market analysis and interest rate.
+        
+            The format of the output should be:
+        
+            **Insights into the current market conditions**
+              Under this section, provide a brief overview of the current market conditions of the coins owned by the user based on the latest news and trends.
+            **Interest rate determined based on the current market conditions**
+              Under this section, provide the interest rate determined based on the current market conditions, and the loan details.
+            
+                               
         """),
         markdown=True,
         show_tool_calls=True,
@@ -350,13 +357,25 @@ def run_finance_agent(prompt):
             symbol = parts[1].strip()
             portfolio[symbol] = amount
 
+      # Before caching the response, convert DataFrame objects to serializable format
+    serializable_metrics = loan_metrics.copy()
+    
+    # Convert correlation matrix if it exists and is a DataFrame
+    if 'correlation_matrix' in serializable_metrics and isinstance(serializable_metrics['correlation_matrix'], pd.DataFrame):
+        serializable_metrics['correlation_matrix'] = serializable_metrics['correlation_matrix'].to_dict()
+
+    # Add any other DataFrame conversions if needed
+    if 'risk_data' in serializable_metrics:
+        serializable_metrics['risk_data'] = [dict(row) for row in serializable_metrics['risk_data']]
+
+
     # Add caching logic here
     cache = ResponseCache()
     
     # Check cache first
-    cached_response, cached_metrics = cache.get_cached_response(prompt, portfolio)
-    if cached_response and cached_metrics:
-        return cached_response, cached_metrics
+    #cached_response, cached_metrics = cache.get_cached_response(prompt, portfolio, response_content, serializable_metrics)
+    #if cached_response and cached_metrics:
+    #    return cached_response, cached_metrics
 
 
     
@@ -371,8 +390,7 @@ def run_finance_agent(prompt):
 
     Please analyze the current market conditions considering:
     1. The latest price movements and volatility metrics shown above
-    2. The correlation between assets in the portfolio. If the correlation between any assets is above 0.8, consider them highly correlated. If the correlation matrix is unavailable, ignore this factor and don't mention it.
-    3. Provide current market analysis and determine appropriate interest rate
+    2. Provide current market analysis and determine appropriate interest rate
 
     """
 
