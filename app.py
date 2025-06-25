@@ -1,3 +1,4 @@
+from dotenv import load_dotenv
 import streamlit as st
 from agent import run_finance_agent
 import os
@@ -9,9 +10,9 @@ import json
 from portfolios import SAMPLE_PORTFOLIOS
 import datetime
 
+load_dotenv()
 
-
-API_KEY = ""  # Replace with your CoinMarketCap key
+API_KEY = os.getenv("CMC_API_KEY")
 os.environ['GROQ_API_KEY'] = ''
 os.environ['PHI_API_KEY'] = ''
 url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest'
