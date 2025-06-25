@@ -4,3 +4,4 @@ streamlit
 agno
 python-dotenv
 groq
+duckduckgo-search
