@@ -3,3 +3,4 @@ requests
 streamlit
 agno
 python-dotenv
+groq
