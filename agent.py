@@ -1,3 +1,4 @@
+from dotenv import load_dotenv
 from cache_utils import ResponseCache
 import time 
 import json
@@ -17,12 +18,11 @@ def run_finance_agent(prompt):
     from datetime import datetime, timedelta
     import datetime 
 
-    os.environ['GROQ_API_KEY'] = ''
-    os.environ['PHI_API_KEY'] = ''
+    load_dotenv()
 
-    API_KEY = ""  # Replace with your CoinMarketCap key
-    os.environ['GROQ_API_KEY'] = ''
-    os.environ['PHI_API_KEY'] = ''
+    API_KEY = os.getenv("CMC_API_KEY")
+    os.environ['GROQ_API_KEY'] = os.getenv("GROQ_API_KEY")
+    os.environ['PHI_API_KEY'] = os.getenv("PHI_API_KEY")
     url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest'
     headers = {'Accepts': 'application/json', 'X-CMC_PRO_API_KEY': API_KEY}
     params = {'start': '1', 'limit': '100', 'convert': 'USD'}
@@ -50,7 +50,7 @@ def run_finance_agent(prompt):
 
             return df
         except Exception as e:
-            print(f"Error fetching data: {e}")
+            print(f"Error fetching data in agent: {e}")
           
 
 

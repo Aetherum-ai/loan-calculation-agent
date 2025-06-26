@@ -13,8 +13,9 @@ import datetime
 load_dotenv()
 
 API_KEY = os.getenv("CMC_API_KEY")
-os.environ['GROQ_API_KEY'] = ''
-os.environ['PHI_API_KEY'] = ''
+os.environ['GROQ_API_KEY'] = os.getenv("GROQ_API_KEY")
+os.environ['PHI_API_KEY'] = os.getenv("PHI_API_KEY")
+
 url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest'
 headers = {'Accepts': 'application/json', 'X-CMC_PRO_API_KEY': API_KEY}
 params = {'start': '1', 'limit': '100', 'convert': 'USD'}

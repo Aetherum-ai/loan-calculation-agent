@@ -4,7 +4,7 @@ streamlit
 agno
 python-dotenv
 groq
-duckduckgo
+duckduckgo-search
 newspaper4k
-textwrap
-pickle
+lxml_html_clean
+tabulate
