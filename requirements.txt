@@ -4,3 +4,7 @@ streamlit
 agno
 python-dotenv
 groq
+duckduckgo
+newspaper4k
+textwrap
+pickle
