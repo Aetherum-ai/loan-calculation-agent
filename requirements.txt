@@ -8,3 +8,6 @@ duckduckgo-search
 newspaper4k
 lxml_html_clean
 tabulate
+Flask
+flask-cors
+flasgger

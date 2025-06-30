@@ -377,9 +377,6 @@ def run_finance_agent(prompt):
     #if cached_response and cached_metrics:
     #    return cached_response, cached_metrics
 
-
-    
-    
     enhanced_prompt = f"""{prompt}
 
     Latest Market Data:

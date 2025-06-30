@@ -125,6 +125,78 @@ def calculate_aetherum_loan(selected_tokens, user_portfolio, df, months):
     }
     return summary
 
+def calculate_loan_api(months, payout, inception_date, bank):
+    
+    TOTAL_PORTFOLIO_VALUE = 1_000_000  # Fixed $1M total portfolio value
+    
+    portfolio_type = "Custom"
+
+    # --- Real-time Crypto Data ---
+    market_df = fetch_data()
+    if not market_df.empty:
+        st.dataframe(market_df)
+    else:
+        raise Exception("Error while fetching market data.")
+
+    # Update portfolio based on selection
+    if portfolio_type == "Custom":
+        available_tokens = market_df['Symbol'].tolist()
+        selected_tokens = available_tokens[:4] # Default to first 4 tokens
+
+        if selected_tokens:
+            num_tokens = len(selected_tokens)
+            allocations = {}
+            # Default to equal allocation
+            for token in selected_tokens:
+                allocations[token] = 100 / num_tokens
+            
+            # Convert percentages to amounts
+            user_portfolio = {
+                token: (percentage / 100) * TOTAL_PORTFOLIO_VALUE 
+                for token, percentage in allocations.items()
+            }
+        else:
+            user_portfolio = {} # Empty portfolio if no tokens are selected
+            raise Exception("Please select at least one token.")
+
+    else:
+        user_portfolio = SAMPLE_PORTFOLIOS[portfolio_type]
+        selected_tokens = list(user_portfolio.keys())
+
+
+    st.header("Loan Input")
+
+    inception_date = pd.Timestamp.today()
+
+    if user_portfolio:
+        # --- Aetherum AI Agent Calculation ---
+        total_collateral = sum(user_portfolio.values())
+        prompt = f"""
+        The user has:
+        {chr(10).join([f"${amount:,.2f} in {symbol}" for symbol, amount in user_portfolio.items()])}
+        Total Collateral = ${total_collateral:,.2f}
+
+        Loan parameters:
+        - Loan Length: {months} months
+        - Payout Currency: {payout}
+        - Inception Date: {inception_date}
+        - Bank: {bank}
+        """
+        agent_response, loan_metrics = run_finance_agent(prompt)
+        
+        # if ~isinstance(loan_metrics, dict):
+        #     raise Exception("Failed to calculate loan metrics from AI Agent.")
+        
+        ###
+
+        # --- Aetherum (Hard-coded Rules) Loan Calculation ---
+        aetherum_loan_details = calculate_aetherum_loan(selected_tokens, user_portfolio, market_df, months)
+
+        return {
+            "agent_response": str(agent_response),
+            "loan_metrics": str(loan_metrics),
+            "aetherum_loan_details": str(aetherum_loan_details)
+        }
 
 def main():
     st.title("Finance Agent Streamlit App")
