@@ -11,3 +11,4 @@ tabulate
 Flask
 flask-cors
 flasgger
+gunicorn
