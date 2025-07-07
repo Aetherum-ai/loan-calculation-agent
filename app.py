@@ -66,7 +66,7 @@ def interest_by_risk(tier, vol):
     adj = 1 if vol > 10 else 0
     return base_rate + premium.get(tier, 5) + adj
 
-def calculate_aetherum_loan(selected_tokens, user_portfolio, df, months):
+def calculate_aetherum_loan(selected_tokens, user_portfolio, df, months, should_show_df_result=True):
     """Calculate loan metrics based on the rules from loan_calc4.py."""
     results = []
     total_collateral = 0
@@ -114,7 +114,6 @@ def calculate_aetherum_loan(selected_tokens, user_portfolio, df, months):
         portfolio_ltv, weighted_interest, liquidation_ltv, expense_ratio, emi = 0, 0, 0, 0, 0
 
     summary = {
-        "df_result": df_result,
         "total_collateral": total_collateral,
         "total_loan": total_loan,
         "portfolio_ltv": portfolio_ltv,
@@ -123,6 +122,12 @@ def calculate_aetherum_loan(selected_tokens, user_portfolio, df, months):
         "expense_ratio": expense_ratio,
         "emi": emi
     }
+
+    if should_show_df_result:
+        summary['df_result'] = df_result
+    else:
+        summary['result'] = results
+
     return summary
 
 def calculate_loan_api(months, payout, inception_date, bank):
@@ -190,12 +195,12 @@ def calculate_loan_api(months, payout, inception_date, bank):
         ###
 
         # --- Aetherum (Hard-coded Rules) Loan Calculation ---
-        aetherum_loan_details = calculate_aetherum_loan(selected_tokens, user_portfolio, market_df, months)
+        aetherum_loan_details = calculate_aetherum_loan(selected_tokens, user_portfolio, market_df, months, False)
 
         return {
-            "agent_response": str(agent_response),
-            "loan_metrics": str(loan_metrics),
-            "aetherum_loan_details": str(aetherum_loan_details)
+            "agent_response": agent_response,
+            "loan_metrics": loan_metrics,
+            "aetherum_loan_details": aetherum_loan_details
         }
 
 def main():
