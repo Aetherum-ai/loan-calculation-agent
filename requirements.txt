@@ -12,3 +12,4 @@ Flask
 flask-cors
 flasgger
 gunicorn
+redis

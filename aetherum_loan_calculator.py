@@ -1,28 +1,13 @@
 import pandas as pd
 import requests
 import datetime
+from cmc_fetcher import fetch_data_app
 
-API_KEY = "2db2e483-08b7-49bf-942d-868184e0e4c4"
-URL = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest'
-HEADERS = {'Accepts': 'application/json', 'X-CMC_PRO_API_KEY': API_KEY}
-PARAMS = {'start': '1', 'limit': '100', 'convert': 'USD'}
 
 def fetch_data():
     """Fetches real-time cryptocurrency data from CoinMarketCap API."""
     try:
-        res = requests.get(URL, headers=HEADERS, params=PARAMS)
-        data = res.json()['data']
-        df = pd.DataFrame([{
-            'Name': coin['name'],
-            'Symbol': coin['symbol'],
-            'Last Price': coin['quote']['USD']['price'],
-            '24h Change (%)': coin['quote']['USD']['percent_change_24h'],
-            '7d Change (%)': coin['quote']['USD']['percent_change_7d'],
-            '30d Change (%)': coin['quote']['USD']['percent_change_30d'],
-            '90d Change (%)': coin['quote']['USD']['percent_change_90d'],
-            'Market Cap': coin['quote']['USD']['market_cap']
-        } for coin in data])
-        return df
+       return fetch_data_app()
     except Exception as e:
         print(f"Error fetching data: {e}")
         return pd.DataFrame()

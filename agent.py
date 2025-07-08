@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 from cache_utils import ResponseCache
 import time 
 import json
+from cmc_fetcher import fetch_data_app
 
 def run_finance_agent(prompt):
     from agno.models.groq import Groq
@@ -20,35 +21,14 @@ def run_finance_agent(prompt):
 
     load_dotenv()
 
-    API_KEY = os.getenv("CMC_API_KEY")
     os.environ['GROQ_API_KEY'] = os.getenv("GROQ_API_KEY")
     os.environ['PHI_API_KEY'] = os.getenv("PHI_API_KEY")
-    url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest'
-    headers = {'Accepts': 'application/json', 'X-CMC_PRO_API_KEY': API_KEY}
-    params = {'start': '1', 'limit': '100', 'convert': 'USD'}
-
-
-
 
     def fetch_data():
         '''Use this function to fetch real-time cryptocurrency data from CoinMarketCap API.'''
 
         try:
-            res = requests.get(url, headers=headers, params=params)
-            data = res.json()['data']
-            df = pd.DataFrame([{
-                'Name': coin['name'],
-                'Symbol': coin['symbol'],
-                'Last Price': coin['quote']['USD']['price'],
-                '24h Change (%)': coin['quote']['USD']['percent_change_24h'],
-                '7d Change (%)': coin['quote']['USD']['percent_change_7d'],
-                '30d Change (%)': coin['quote']['USD']['percent_change_30d'],
-                '90d Change (%)': coin['quote']['USD']['percent_change_90d'],
-                'Market Cap': coin['quote']['USD']['market_cap']
-            } for coin in data])
-            
-
-            return df
+            return fetch_data_app()
         except Exception as e:
             print(f"Error fetching data in agent: {e}")
           

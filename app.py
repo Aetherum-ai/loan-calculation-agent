@@ -3,12 +3,10 @@ import streamlit as st
 from agent import run_finance_agent
 import os
 import pandas as pd
-from requests import Session
-from requests.exceptions import ConnectionError, Timeout, TooManyRedirects
-import requests
 import json
 from portfolios import SAMPLE_PORTFOLIOS
 import datetime
+from cmc_fetcher import fetch_data_app
 
 load_dotenv()
 
@@ -16,25 +14,9 @@ API_KEY = os.getenv("CMC_API_KEY")
 os.environ['GROQ_API_KEY'] = os.getenv("GROQ_API_KEY")
 os.environ['PHI_API_KEY'] = os.getenv("PHI_API_KEY")
 
-url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest'
-headers = {'Accepts': 'application/json', 'X-CMC_PRO_API_KEY': API_KEY}
-params = {'start': '1', 'limit': '100', 'convert': 'USD'}
-
-
 def fetch_data():
     """Fetch data for the top 100 cryptocurrencies from CoinMarketCap."""
-    res = requests.get(url, headers=headers, params=params)
-    data = res.json()['data']
-    return pd.DataFrame([{
-        'Name': coin['name'],
-        'Symbol': coin['symbol'],
-        'Last Price': coin['quote']['USD']['price'],
-        '24h Change (%)': coin['quote']['USD']['percent_change_24h'],
-        '7d Change (%)': coin['quote']['USD']['percent_change_7d'],
-        '30d Change (%)': coin['quote']['USD']['percent_change_30d'],
-        '90d Change (%)': coin['quote']['USD']['percent_change_90d'],
-        'Market Cap': coin['quote']['USD']['market_cap']
-    } for coin in data])
+    return fetch_data_app()
 
 
 # -------- LOGIC from loan_calc4.py: LTV & INTEREST RULES --------
