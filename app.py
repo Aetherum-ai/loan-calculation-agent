@@ -120,9 +120,7 @@ def calculate_loan_api(months, payout, inception_date, bank):
 
     # --- Real-time Crypto Data ---
     market_df = fetch_data()
-    if not market_df.empty:
-        st.dataframe(market_df)
-    else:
+    if market_df.empty:
         raise Exception("Error while fetching market data.")
 
     # Update portfolio based on selection
@@ -151,9 +149,9 @@ def calculate_loan_api(months, payout, inception_date, bank):
         selected_tokens = list(user_portfolio.keys())
 
 
-    st.header("Loan Input")
+    # "Loan Input"
 
-    inception_date = pd.Timestamp.today()
+    inception_date = pd.Timestamp(inception_date)
 
     if user_portfolio:
         # --- Aetherum AI Agent Calculation ---
