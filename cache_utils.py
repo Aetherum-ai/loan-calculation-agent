@@ -56,4 +56,4 @@ class ResponseCache:
         }
         
         with open(cache_file, 'w') as f:
-            json.dump(cache_data, f)
+            json.dump(cache_data, f, default=str)

@@ -112,9 +112,10 @@ def calculate_aetherum_loan(selected_tokens, user_portfolio, df, months, should_
 
     return summary
 
-def calculate_loan_api(months, payout, inception_date, bank):
+def calculate_loan_api(totalPortfolioValue, listOfSelectedTokens, months, payout, inception_date, bank):
     
-    TOTAL_PORTFOLIO_VALUE = 1_000_000  # Fixed $1M total portfolio value
+    # TOTAL_PORTFOLIO_VALUE = 1_000_000  # Fixed $1M total portfolio value
+    TOTAL_PORTFOLIO_VALUE = totalPortfolioValue
     
     portfolio_type = "Custom"
 
@@ -125,8 +126,9 @@ def calculate_loan_api(months, payout, inception_date, bank):
 
     # Update portfolio based on selection
     if portfolio_type == "Custom":
-        available_tokens = market_df['Symbol'].tolist()
-        selected_tokens = available_tokens[:4] # Default to first 4 tokens
+        # available_tokens = market_df['Symbol'].tolist()
+        # selected_tokens = available_tokens[:4] # Default to first 4 tokens
+        selected_tokens = listOfSelectedTokens
 
         if selected_tokens:
             num_tokens = len(selected_tokens)

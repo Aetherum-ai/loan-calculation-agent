@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from app import calculate_loan_api, main
 from flasgger import Swagger, swag_from
 from flask_cors import CORS
+from utils import convert_df_fields
 
 app = Flask(__name__)
 CORS(app)  # 👈 Enables CORS for all routes
@@ -66,11 +67,16 @@ def calculate_loan():
     payout = data.get("payout")
     inception_date = data.get("inception_date")
     bank = data.get("bank")
+    totalPortfolioValue = data.get("totalPortfolioValue")
+    listOfSelectedTokens = data.get("listOfSelectedTokens")
 
-    if not all([months, payout, inception_date, bank]):
+
+    if not all([totalPortfolioValue, listOfSelectedTokens, months, payout, inception_date, bank]):
         return jsonify({"error": "Missing required fields"}), 400
 
-    result = calculate_loan_api(months, payout, inception_date, bank)
+    result = calculate_loan_api(totalPortfolioValue, listOfSelectedTokens, months, payout, inception_date, bank)
+    result = convert_df_fields(result)
+    
     return jsonify({'description': 'Loan calculation successful', "result": result})
 
 if __name__ == "__main__":
