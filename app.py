@@ -48,7 +48,7 @@ def interest_by_risk(tier, vol):
     adj = 1 if vol > 10 else 0
     return base_rate + premium.get(tier, 5) + adj
 
-def calculate_aetherum_loan(selected_tokens, user_portfolio, df, months, should_show_df_result=True):
+def calculate_aetherum_loan(allocations, selected_tokens, user_portfolio, df, months, should_show_df_result=True):
     """Calculate loan metrics based on the rules from loan_calc4.py."""
     results = []
     total_collateral = 0
@@ -77,7 +77,8 @@ def calculate_aetherum_loan(selected_tokens, user_portfolio, df, months, should_
             "LTV (%)": ltv,
             "Interest Rate (%)": interest,
             "Collateral ($)": f"${portfolio_amount:,.2f}",
-            "Loan Amount ($)": f"${loan_amount:,.2f}"
+            "Loan Amount ($)": f"${loan_amount:,.2f}",
+            "allocation": allocations[symbol]
         })
 
         total_collateral += portfolio_amount
@@ -169,7 +170,7 @@ def calculate_loan_api(totalPortfolioValue, listOfSelectedTokens, months, payout
         - Inception Date: {inception_date}
         - Bank: {bank}
         """
-        agent_response, loan_metrics = run_finance_agent(prompt)
+        agent_response, loan_metrics = run_finance_agent(prompt, allocations)
         
         # if ~isinstance(loan_metrics, dict):
         #     raise Exception("Failed to calculate loan metrics from AI Agent.")
@@ -177,12 +178,16 @@ def calculate_loan_api(totalPortfolioValue, listOfSelectedTokens, months, payout
         ###
 
         # --- Aetherum (Hard-coded Rules) Loan Calculation ---
-        aetherum_loan_details = calculate_aetherum_loan(selected_tokens, user_portfolio, market_df, months, False)
+        aetherum_loan_details = calculate_aetherum_loan(allocations, selected_tokens, user_portfolio, market_df, months, False)
+
+        length = "1 month" if months == 1 else f"{months} months"
 
         return {
             "agent_response": agent_response,
             "loan_metrics": loan_metrics,
-            "aetherum_loan_details": aetherum_loan_details
+            "aetherum_loan_details": aetherum_loan_details,
+            "loan_length": length,
+            "loan_frequency": "monthly",
         }
 
 def main():
@@ -275,7 +280,7 @@ def main():
             - Inception Date: {inception_date}
             - Bank: {bank}
             """
-            agent_response, loan_metrics = run_finance_agent(prompt)
+            agent_response, loan_metrics = run_finance_agent(prompt, allocations)
             
             st.header("Aetherum AI Agent Loan Calculator")
             if isinstance(loan_metrics, dict):
@@ -295,7 +300,7 @@ def main():
 
             # --- Aetherum (Hard-coded Rules) Loan Calculation ---
             st.header("Aetherum Loan")
-            aetherum_loan_details = calculate_aetherum_loan(selected_tokens, user_portfolio, market_df, months)
+            aetherum_loan_details = calculate_aetherum_loan(allocations, selected_tokens, user_portfolio, market_df, months)
 
             st.subheader("Asset-Based Loan Breakdown")
             st.dataframe(aetherum_loan_details["df_result"])

@@ -4,7 +4,7 @@ import time
 import json
 from cmc_fetcher import fetch_data_app
 
-def run_finance_agent(prompt):
+def run_finance_agent(prompt, allocations):
     from agno.models.groq import Groq
     from agno.agent import Agent
     from agno.tools.duckduckgo import DuckDuckGoTools
@@ -254,6 +254,10 @@ def run_finance_agent(prompt):
         expense_ratio = 0.0005 * loan_amount  # 0.05% of loan amount
         
         return {
+            # TODO: we need emi here as well,
+            # we need to calculate the monthly EMI based on the loan amount, interest rate, and tenure
+            # we need o return the interest rate as well
+            # we also need the Interest Paid over the lifetime of the loan
             "portfolio_value": total_value,
             "weighted_ltv": weighted_ltv,
             "loan_amount": loan_amount,
@@ -266,6 +270,7 @@ def run_finance_agent(prompt):
                     "amount": amount,
                     "baseline_ltv": baseline_ltvs[symbol],
                     "adjusted_ltv": adjusted_ltvs[symbol],
+                    "allocation": allocations[symbol],
                 }
                 for symbol, amount in portfolio.items()
             }
